@@ -102,10 +102,9 @@ class BaseGNN(nn.Module):
         self.pooling = pooling
         self.conv_type = conv_type
 
-        # 输入投影
         self.input_proj = nn.Linear(input_dim, hidden_dim)
 
-        # GNN层
+        # GNN
         self.convs = nn.ModuleList()
         self.batch_norms = nn.ModuleList()
 
@@ -113,13 +112,11 @@ class BaseGNN(nn.Module):
             self.convs.append(create_conv_layer(conv_type, hidden_dim, hidden_dim))
             self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
 
-        # 图级表示维度
         if pooling == 'mean_sum':
             graph_repr_dim = hidden_dim * 2
         else:
             graph_repr_dim = hidden_dim
 
-        # 预测头
         self.fc1 = nn.Linear(graph_repr_dim, hidden_dim // 2)
         self.fc2 = nn.Linear(hidden_dim // 2, hidden_dim // 4)
         self.fc_out = nn.Linear(hidden_dim // 4, 1)
@@ -128,10 +125,8 @@ class BaseGNN(nn.Module):
         x = g.ndata['feat']
         edge_feat = g.edata.get('dist', None)
 
-        # 输入投影
         x = F.relu(self.input_proj(x))
 
-        # GNN卷积
         for i in range(self.num_layers):
             if self.conv_type == 'schnet':
                 x_new = self.convs[i](g, x, edge_feat)
@@ -142,10 +137,9 @@ class BaseGNN(nn.Module):
             x_new = F.dropout(x_new, p=self.dropout, training=self.training)
             x = x + x_new  # 残差
 
-        # 图级pooling
+        # pooling
         x_graph = self._graph_pooling(g, x)
 
-        # 预测
         x_graph = F.dropout(x_graph, p=self.dropout, training=self.training)
         x_graph = F.relu(self.fc1(x_graph))
         x_graph = F.dropout(x_graph, p=self.dropout, training=self.training)
@@ -170,10 +164,9 @@ class BaseGNN(nn.Module):
                 return torch.cat([x_mean, x_sum], dim=1)
 
 
-# ============= cross attention组件 =============
+# ============= cross attention =============
 
 class CrossAttention(nn.Module):
-    """跨粒度注意力"""
 
     def __init__(self, seq_dim, struct_dim, hidden_dim=128):
         super().__init__()
@@ -189,7 +182,7 @@ class CrossAttention(nn.Module):
         self.scale = hidden_dim ** -0.5
 
     def forward(self, seq_feat, struct_feat):
-        # 序列 attend to 结构
+        # seq attend to struc
         Q_seq = self.query_seq(seq_feat)
         K_struct = self.key_struct(struct_feat)
         V_struct = self.value_struct(struct_feat)
@@ -197,7 +190,7 @@ class CrossAttention(nn.Module):
         attn_seq = torch.softmax(Q_seq * K_struct * self.scale, dim=-1)
         seq_attended = attn_seq * V_struct
 
-        # 结构 attend to 序列
+        # struc attend to seq
         Q_struct = self.query_struct(struct_feat)
         K_seq = self.key_seq(seq_feat)
         V_seq = self.value_seq(seq_feat)
@@ -209,7 +202,6 @@ class CrossAttention(nn.Module):
 
 
 class BilinearFusion(nn.Module):
-    """双线性融合"""
 
     def __init__(self, dim1, dim2, hidden_dim):
         super().__init__()
@@ -230,18 +222,10 @@ class BilinearFusion(nn.Module):
 
 class EvidentialLayer(nn.Module):
     """
-    Evidential Deep Learning层 - 用于不确定性量化回归
-
-    基于:
-    - NeurIPS 2024: "Are Uncertainty Quantification Capabilities of Evidential..."
-    - Nature 2025: "Uncertainty quantification in regression neural networks..."
-    - ACS Central Science: "Evidential Deep Learning for Guided Molecular Property Prediction"
-
-    输出4个参数: (gamma, nu, alpha, beta) -> 定义一个Normal-Inverse-Gamma分布
-    可以从中估计:
-        - 预测值: gamma
-        - 偶然不确定性 (aleatoric): beta / (alpha - 1)
-        - 认知不确定性 (epistemic): beta / (nu * (alpha - 1))
+    Evidential Deep Learning
+    (gamma, nu, alpha, beta) -> Normal-Inverse-Gamma
+        - value : gamma
+        - epistemic: beta / (nu * (alpha - 1))
     """
 
     def __init__(self, input_dim, hidden_dim=128):
@@ -253,11 +237,10 @@ class EvidentialLayer(nn.Module):
             nn.Dropout(0.1)
         )
 
-        # 输出4个evidential参数
-        self.gamma_head = nn.Linear(hidden_dim, 1)  # 预测均值
-        self.nu_head = nn.Linear(hidden_dim, 1)     # 虚拟样本数
-        self.alpha_head = nn.Linear(hidden_dim, 1)  # 形状参数
-        self.beta_head = nn.Linear(hidden_dim, 1)   # 尺度参数
+        self.gamma_head = nn.Linear(hidden_dim, 1) 
+        self.nu_head = nn.Linear(hidden_dim, 1)     
+        self.alpha_head = nn.Linear(hidden_dim, 1)  
+        self.beta_head = nn.Linear(hidden_dim, 1)  
 
     def forward(self, x):
         """
