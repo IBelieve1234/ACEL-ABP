@@ -7,10 +7,7 @@ import dgl
 
 class DeterministicGraphConv(nn.Module):
     """
-    确定性图卷积层 - 替代 DGL 的 GraphConv
-
-    使用矩阵乘法实现消息传递，避免 scatter/gather 的非确定性
-    公式: h' = D^{-1} * A * h * W + b
+    h' = D^{-1} * A * h * W + b
     """
 
     def __init__(self, in_channels, out_channels, allow_zero_in_degree=True):
@@ -19,7 +16,6 @@ class DeterministicGraphConv(nn.Module):
         self.out_channels = out_channels
         self.allow_zero_in_degree = allow_zero_in_degree
 
-        # 线性变换
         self.weight = nn.Parameter(torch.Tensor(in_channels, out_channels))
         self.bias = nn.Parameter(torch.Tensor(out_channels))
 
@@ -32,34 +28,34 @@ class DeterministicGraphConv(nn.Module):
     def forward(self, g, node_feat):
         """
         Args:
-            g: DGL 图
-            node_feat: 节点特征 [num_nodes, in_channels]
+            g: DGL 
+            node_feat:  [num_nodes, in_channels]
         Returns:
-            输出特征 [num_nodes, out_channels]
+             [num_nodes, out_channels]
         """
         with g.local_scope():
             num_nodes = g.num_nodes()
             device = node_feat.device
 
-            # 获取邻接矩阵（稀疏 -> 稠密，确保确定性）
+            
             src, dst = g.edges()
 
-            # 构建邻接矩阵
+            
             adj = torch.zeros(num_nodes, num_nodes, device=device)
-            adj[dst, src] = 1.0  # dst <- src 的消息传递
+            adj[dst, src] = 1.0  # dst <- src 
 
-            # 添加自环
+            
             adj = adj + torch.eye(num_nodes, device=device)
 
-            # 对称归一化: D^{-1/2} * A * D^{-1/2} (与 DGL GraphConv 一致)
+            #  D^{-1/2} * A * D^{-1/2} (与 DGL GraphConv 一致)
             deg = adj.sum(dim=1).clamp(min=1)
             deg_inv_sqrt = deg.pow(-0.5)
             adj_norm = deg_inv_sqrt.unsqueeze(1) * adj * deg_inv_sqrt.unsqueeze(0)
 
-            # 消息传递: h' = D^{-1/2} * A * D^{-1/2} * h
+            #  h' = D^{-1/2} * A * D^{-1/2} * h
             h = torch.matmul(adj_norm, node_feat)
 
-            # 线性变换: h' * W + b
+            #  h' * W + b
             out = torch.matmul(h, self.weight) + self.bias
 
             return out
@@ -67,14 +63,13 @@ class DeterministicGraphConv(nn.Module):
 
 def create_conv_layer(conv_type, in_channels, out_channels, num_filters=128, num_heads=4):
     """
-    创建卷积层的工厂函数
 
     Args:
         conv_type: 'graphconv'
-        in_channels: 输入维度
-        out_channels: 输出维度
-        num_filters: SchNet的中间维度
-        num_heads: GAT的头数
+        in_channels
+        out_channels
+        num_filters
+        num_heads
     """
 
     if conv_type == 'graphconv':
@@ -84,22 +79,11 @@ def create_conv_layer(conv_type, in_channels, out_channels, num_filters=128, num
         raise ValueError(f"Unknown conv_type: {conv_type}. Choose 'graphconv'.")
 
 
-# ============= base模型 =============
+# ============= base model =============
 
 
 class BaseGNN(nn.Module):
-    """基础GNN模型"""
-    """
-    特性	    BaseGNN	                        SimpleGraphConvGNN
-    卷积类型	SchNetConv（自定义）	            GraphConv（DGL内置）
-    边特征	    ✅使用距离	                       ❌ 不使用
-    距离编码	✅ RBF展开	                       ❌ 无
-    池化	    可配置4种	                        固定mean_sum
-    BatchNorm   显式	                           隐式
-    复杂度	    高	                                低
-    速度	    较慢	                            较快
-    精度	    通常更高	                        基线水平
-    适用场景	3D分子结构	                        通用图数据
+    """base GNN"""
     """
 
     def __init__(
