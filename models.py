@@ -32,11 +32,11 @@ class DeterministicGraphConv(nn.Module):
             src, dst = g.edges()
 
             adj = torch.zeros(num_nodes, num_nodes, device=device)
-            adj[dst, src] = 1.0  # dst <- src 的消息传递
+            adj[dst, src] = 1.0  # dst <- src 
 
             adj = adj + torch.eye(num_nodes, device=device)
 
-            #  D^{-1/2} * A * D^{-1/2} (与 DGL GraphConv 一致)
+            #  D^{-1/2} * A * D^{-1/2} 
             deg = adj.sum(dim=1).clamp(min=1)
             deg_inv_sqrt = deg.pow(-0.5)
             adj_norm = deg_inv_sqrt.unsqueeze(1) * adj * deg_inv_sqrt.unsqueeze(0)
@@ -494,7 +494,7 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
             self.gnn_convs.append(create_conv_layer(conv_type, graph_hidden_dim, graph_hidden_dim))
             self.batch_norms.append(nn.BatchNorm1d(graph_hidden_dim))
 
-        # Graph Transformer层 (可选)
+        # Graph Transformer layer (deprecated)
         if use_transformer:
             self.transformer_layers = nn.ModuleList([
                 GraphTransformerLayer(graph_hidden_dim, num_heads=num_heads, dropout=dropout)
