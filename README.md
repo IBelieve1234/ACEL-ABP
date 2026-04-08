@@ -3,7 +3,7 @@
 ## 1. Project Overview
 
 This repository provides code for "ACEL-ABP: activity cliff-aware evidential deep learning for predicting antibacterial peptide activity"
-The current main training path uses evidential regression to estimate both prediction and uncertainty.
+The current main training path uses evidential regression to make predictions while estimating uncertainty to enhance prediction quality.
 
 Core scripts:
 
