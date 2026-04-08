@@ -1,4 +1,4 @@
-# ACEL-ABP (Sequence + Structure Multi-Granularity Regression)
+# ACEL-ABP (ACEL-ABP: activity cliff-aware evidential deep learning for predicting antibacterial peptide activity)
 
 ## 1. Project Overview
 
