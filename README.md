@@ -37,11 +37,11 @@ Core scripts:
 │     ├─ test.csv
 │     ├─ grampa_s_aureus_7_25_with_GRAMPA.csv
 │     └─ add_activity.py
+├─ llm/
+│  └─ ...
 └─ pdb/
    └─ *.pdb
 ```
-
----
 
 ## 3. Environment & Dependencies
 
