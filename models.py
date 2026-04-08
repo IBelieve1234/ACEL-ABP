@@ -830,7 +830,9 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
         elif self.fusion_strategy == 'parallel':
             final_fused = self._forward_parallel(seq_repr, struct_repr, feature_repr)
 
+        # 根据 use_evidential 选择预测方式
         if self.use_evidential:
+            # Evidential预测
             gamma, nu, alpha, beta = self.predictor(final_fused)
             pred = gamma.squeeze(-1)
 
@@ -840,6 +842,7 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
                 return pred, aleatoric, epistemic, (gamma, nu, alpha, beta)
             return pred
         else:
+            # 普通MLP预测
             pred = self.predictor(final_fused)
             return pred.squeeze(-1)
 
