@@ -7,7 +7,10 @@ import dgl
 
 class DeterministicGraphConv(nn.Module):
     """
-    h' = D^{-1} * A * h * W + b
+    确定性图卷积层 - 替代 DGL 的 GraphConv
+
+    使用矩阵乘法实现消息传递，避免 scatter/gather 的非确定性
+    公式: h' = D^{-1} * A * h * W + b
     """
 
     def __init__(self, in_channels, out_channels, allow_zero_in_degree=True):
@@ -16,6 +19,7 @@ class DeterministicGraphConv(nn.Module):
         self.out_channels = out_channels
         self.allow_zero_in_degree = allow_zero_in_degree
 
+        # 线性变换
         self.weight = nn.Parameter(torch.Tensor(in_channels, out_channels))
         self.bias = nn.Parameter(torch.Tensor(out_channels))
 
@@ -28,49 +32,40 @@ class DeterministicGraphConv(nn.Module):
     def forward(self, g, node_feat):
         """
         Args:
-            g: DGL 
-            node_feat:  [num_nodes, in_channels]
+            g: DGL 图
+            node_feat: 节点特征 [num_nodes, in_channels]
         Returns:
-             [num_nodes, out_channels]
+            输出特征 [num_nodes, out_channels]
         """
         with g.local_scope():
             num_nodes = g.num_nodes()
             device = node_feat.device
 
-            
+            # 获取邻接矩阵（稀疏 -> 稠密，确保确定性）
             src, dst = g.edges()
 
-            
+            # 构建邻接矩阵
             adj = torch.zeros(num_nodes, num_nodes, device=device)
-            adj[dst, src] = 1.0  # dst <- src 
+            adj[dst, src] = 1.0  # dst <- src 的消息传递
 
-            
+            # 添加自环
             adj = adj + torch.eye(num_nodes, device=device)
 
-            #  D^{-1/2} * A * D^{-1/2} (与 DGL GraphConv 一致)
+            # 对称归一化: D^{-1/2} * A * D^{-1/2} (与 DGL GraphConv 一致)
             deg = adj.sum(dim=1).clamp(min=1)
             deg_inv_sqrt = deg.pow(-0.5)
             adj_norm = deg_inv_sqrt.unsqueeze(1) * adj * deg_inv_sqrt.unsqueeze(0)
 
-            #  h' = D^{-1/2} * A * D^{-1/2} * h
+            # 消息传递: h' = D^{-1/2} * A * D^{-1/2} * h
             h = torch.matmul(adj_norm, node_feat)
 
-            #  h' * W + b
+            # 线性变换: h' * W + b
             out = torch.matmul(h, self.weight) + self.bias
 
             return out
 
 
 def create_conv_layer(conv_type, in_channels, out_channels, num_filters=128, num_heads=4):
-    """
-
-    Args:
-        conv_type: 'graphconv'
-        in_channels
-        out_channels
-        num_filters
-        num_heads
-    """
 
     if conv_type == 'graphconv':
         return DeterministicGraphConv(in_channels, out_channels, allow_zero_in_degree=True)
@@ -79,12 +74,10 @@ def create_conv_layer(conv_type, in_channels, out_channels, num_filters=128, num
         raise ValueError(f"Unknown conv_type: {conv_type}. Choose 'graphconv'.")
 
 
-# ============= base model =============
+# ============= base =============
 
 
 class BaseGNN(nn.Module):
-    """base GNN"""
-    """
 
     def __init__(
         self,
@@ -93,7 +86,7 @@ class BaseGNN(nn.Module):
         num_layers=3,
         dropout=0.2,
         pooling='mean_sum',
-        conv_type='schnet'  # 新增: 'schnet' or 'graphconv'
+        conv_type='schnet'  # 'schnet'  'graphconv'
     ):
         super().__init__()
 
@@ -102,9 +95,10 @@ class BaseGNN(nn.Module):
         self.pooling = pooling
         self.conv_type = conv_type
 
+
         self.input_proj = nn.Linear(input_dim, hidden_dim)
 
-        # GNN
+
         self.convs = nn.ModuleList()
         self.batch_norms = nn.ModuleList()
 
@@ -117,6 +111,7 @@ class BaseGNN(nn.Module):
         else:
             graph_repr_dim = hidden_dim
 
+
         self.fc1 = nn.Linear(graph_repr_dim, hidden_dim // 2)
         self.fc2 = nn.Linear(hidden_dim // 2, hidden_dim // 4)
         self.fc_out = nn.Linear(hidden_dim // 4, 1)
@@ -127,6 +122,7 @@ class BaseGNN(nn.Module):
 
         x = F.relu(self.input_proj(x))
 
+        # GNN
         for i in range(self.num_layers):
             if self.conv_type == 'schnet':
                 x_new = self.convs[i](g, x, edge_feat)
@@ -135,11 +131,12 @@ class BaseGNN(nn.Module):
             x_new = self.batch_norms[i](x_new)
             x_new = F.relu(x_new)
             x_new = F.dropout(x_new, p=self.dropout, training=self.training)
-            x = x + x_new  # 残差
+            x = x + x_new  # 
 
         # pooling
         x_graph = self._graph_pooling(g, x)
 
+        # 预测
         x_graph = F.dropout(x_graph, p=self.dropout, training=self.training)
         x_graph = F.relu(self.fc1(x_graph))
         x_graph = F.dropout(x_graph, p=self.dropout, training=self.training)
@@ -223,8 +220,9 @@ class BilinearFusion(nn.Module):
 class EvidentialLayer(nn.Module):
     """
     Evidential Deep Learning
+
     (gamma, nu, alpha, beta) -> Normal-Inverse-Gamma
-        - value : gamma
+        - prediction: gamma
         - epistemic: beta / (nu * (alpha - 1))
     """
 
@@ -248,10 +246,10 @@ class EvidentialLayer(nn.Module):
             x: [batch, input_dim]
 
         Returns:
-            gamma: [batch, 1] 预测值
-            nu: [batch, 1] 虚拟样本数 (>0)
-            alpha: [batch, 1] 形状参数 (>1)
-            beta: [batch, 1] 尺度参数 (>0)
+            gamma: [batch, 1] 
+            nu: [batch, 1]  (>0)
+            alpha: [batch, 1]  (>1)
+            beta: [batch, 1]  (>0)
         """
         h = self.hidden(x)
 
@@ -265,7 +263,7 @@ class EvidentialLayer(nn.Module):
 
 class EvidentialRegressionLoss(nn.Module):
     """
-    Evidential回归损失函数
+    Evidential loss
 
     Loss = NLL + λ * Regularization
     """
@@ -278,10 +276,10 @@ class EvidentialRegressionLoss(nn.Module):
         """
         Args:
             gamma, nu, alpha, beta: evidential参数 [batch, 1]
-            target: 真实值 [batch]
+            target: true [batch]
 
         Returns:
-            loss: 标量损失
+            loss
         """
         target = target.unsqueeze(-1)  # [batch, 1]
 
@@ -292,7 +290,6 @@ class EvidentialRegressionLoss(nn.Module):
               + (alpha + 0.5) * torch.log(nu * (target - gamma)**2 + omega) \
               + torch.lgamma(alpha) - torch.lgamma(alpha + 0.5)
 
-        # 正则化项 (鼓励高alpha，降低不确定性)
         error = torch.abs(target - gamma)
         reg = error * (2 * nu + alpha)
 
@@ -303,12 +300,10 @@ class EvidentialRegressionLoss(nn.Module):
 
 class FocalRegressionLoss(nn.Module):
     """
-    Focal Loss for Regression - 聚焦难样本
+    Focal Loss for Regression
 
-    基于: 多个2024会议论文
     FL(x) = |y - y_pred|^gamma * loss(x)
 
-    gamma > 0: 难样本权重更高
     """
 
     def __init__(self, gamma=2.0, loss_type='mse'):
@@ -324,7 +319,6 @@ class FocalRegressionLoss(nn.Module):
         """
         error = torch.abs(pred - target)
 
-        # Focal权重: 误差越大，权重越高
         focal_weight = torch.pow(error, self.gamma)
 
         if self.loss_type == 'mse':
@@ -347,13 +341,6 @@ class FocalRegressionLoss(nn.Module):
 
 
 class GraphTransformerLayer(nn.Module):
-    """
-    Graph Transformer层 with enhanced positional encoding
-
-    基于:
-    - NeurIPS 2024: "Enhancing Graph Transformers with Hierarchical Distance Structural Encoding"
-    - IJCAI 2024: "Gradformer: Graph Transformer with Exponential Decay"
-    """
 
     def __init__(self, hidden_dim, num_heads=4, dropout=0.1):
         super().__init__()
@@ -379,6 +366,7 @@ class GraphTransformerLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, g, x, pe=None):
+        # 加入位置编码
         if pe is not None:
             x = x + pe
 
@@ -409,6 +397,7 @@ class GraphTransformerLayer(nn.Module):
         return x
 
 
+
 def get_model(
     use_multigrain=False,
     model_type='base',
@@ -416,11 +405,11 @@ def get_model(
     ablation_tech=None,
     **kwargs
 ):
+
     if ablation_tech is not None:
         if not use_multigrain:
             raise ValueError("ablation_tech requires use_multigrain=True")
 
-        # 消融模型通用参数
         ablation_base_params = [
             'graph_input_dim', 'graph_hidden_dim', 'num_gnn_layers', 'lm_hidden_dim',
             'use_lm', 'interaction_hidden_dim', 'extra_feature_dim', 'fusion_strategy',
@@ -428,12 +417,10 @@ def get_model(
         ]
         ablation_kwargs = {k: v for k, v in kwargs.items() if k in ablation_base_params}
 
-        # 如果没有使用额外特征，确保 extra_feature_dim = 0
         if not use_extra_features:
             ablation_kwargs['extra_feature_dim'] = 0
 
         if ablation_tech == 'transformer_evidential':
-            # Transformer + Evidential (支持独立控制)
             if 'num_transformer_layers' in kwargs:
                 ablation_kwargs['num_transformer_layers'] = kwargs['num_transformer_layers']
             if 'num_heads' in kwargs:
@@ -843,9 +830,7 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
         elif self.fusion_strategy == 'parallel':
             final_fused = self._forward_parallel(seq_repr, struct_repr, feature_repr)
 
-        # 根据 use_evidential 选择预测方式
         if self.use_evidential:
-            # Evidential预测
             gamma, nu, alpha, beta = self.predictor(final_fused)
             pred = gamma.squeeze(-1)
 
@@ -855,7 +840,6 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
                 return pred, aleatoric, epistemic, (gamma, nu, alpha, beta)
             return pred
         else:
-            # 普通MLP预测
             pred = self.predictor(final_fused)
             return pred.squeeze(-1)
 
