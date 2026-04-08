@@ -351,7 +351,6 @@ class GraphTransformerLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, g, x, pe=None):
-        # 加入位置编码
         if pe is not None:
             x = x + pe
 
@@ -416,9 +415,10 @@ def get_model(
             use_evid = ablation_kwargs.get('use_evidential', True)
 
             print(f"\n{'='*60}")
-            print(f"[模型创建] 使用模型: HybridMultiGrainGNN_Evidential")
-            print(f"  - 交互类型: {model_type}")
-            print(f"  - 使用 Evidential: {use_evid}")
+            print(f"[Model Creation] Using model: HybridMultiGrainGNN_Evidential")
+            print(f"  - Interaction type: {model_type}")
+            print(f"  - Use Evidential: {use_evid}")
+
             print(f"{'='*60}\n")
             return HybridMultiGrainGNN_Evidential(
                 interaction_type=model_type,
@@ -430,7 +430,6 @@ def get_model(
                            f"Supported: 'transformer_evidential', 'node_level_fusion'.")
 
     else:
-        # 单粒度模型
         if model_type == 'base':
             print(f"\n{'='*60}")
             print(f" BaseGNN")
@@ -443,7 +442,6 @@ def get_model(
 class HybridMultiGrainGNN_Evidential(nn.Module):
     """
         - use_transformer=False, use_evidential=True →  (Transformer:No , evidential loss:Yes)
-        transformer层已关闭，仅使用Evidential
     """
 
     def __init__(
@@ -480,13 +478,12 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
         self.use_transformer = use_transformer
         self.use_evidential = use_evidential
 
-        # 打印消融配置
-        print(f"\n[实验模型] 配置:")
-        print(f"  - 使用语言模型(LM): {use_lm}")
-        print(f"  - 使用 Evidential: {use_evidential}")
-        print(f"  - 融合策略: {fusion_strategy}")
+        print(f"\n[Experimental Model] Settings:")
+        print(f"  - Language Model (LM): {use_lm}")
+        print(f"  - Evidential: {use_evidential}")
+        print(f"  - Fusion strategy: {fusion_strategy}")
 
-        # 细粒度分支
+
         self.input_proj = nn.Linear(graph_input_dim, graph_hidden_dim)
         self.gnn_convs = nn.ModuleList()
         self.batch_norms = nn.ModuleList()
@@ -494,7 +491,7 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
             self.gnn_convs.append(create_conv_layer(conv_type, graph_hidden_dim, graph_hidden_dim))
             self.batch_norms.append(nn.BatchNorm1d(graph_hidden_dim))
 
-        # Graph Transformer layer (deprecated)
+        # Graph Transformer layer (hac been deprecated)
         if use_transformer:
             self.transformer_layers = nn.ModuleList([
                 GraphTransformerLayer(graph_hidden_dim, num_heads=num_heads, dropout=dropout)
@@ -522,17 +519,13 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
         self.pretrained_lm = None
 
     def _build_fusion_modules(self, interaction_type, interaction_hidden_dim, dropout):
-        # ========== LM 消融模式：不使用序列表示 ==========
         if not self.use_lm:
-            # 只使用结构表示 + 额外特征
             self.struct_proj = nn.Sequential(
                 nn.Linear(self.graph_repr_dim, interaction_hidden_dim),
                 nn.ReLU(),
                 nn.Dropout(dropout)
             )
             if self.has_extra_features:
-                # 额外特征投影（已在__init__中定义feature_mlp，这里不需要重复）
-                # 根据 interaction_type 选择融合方式
                 if interaction_type == 'cross_attention':
                     self.struct_feat_interaction = CrossAttention(
                         seq_dim=interaction_hidden_dim,
@@ -547,13 +540,13 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
                         hidden_dim=interaction_hidden_dim
                     )
                     fusion_input_dim = interaction_hidden_dim
-                else:  # concat - 直接拼接
+                else:  # concat 
                     self.struct_feat_interaction = None
                     fusion_input_dim = interaction_hidden_dim * 2
             else:
                 fusion_input_dim = interaction_hidden_dim
 
-            # 根据 use_evidential 选择预测头
+            # Choose prediction head according to use_evidential
             if self.use_evidential:
                 self.predictor = EvidentialLayer(fusion_input_dim, hidden_dim=512)
             else:
@@ -569,9 +562,9 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
                     nn.Dropout(dropout),
                     nn.Linear(128, 1)
                 )
-            return  # 提前返回，不构建序列相关模块
+            return  # return early; do not build sequence-related modules
 
-        # ========== 正常模式：使用序列 + 结构 融合 ==========
+        # ========== Normal mode: use sequence + structure fusion ==========
         if self.fusion_strategy == 'late':
             self.seq_proj = nn.Sequential(nn.Linear(self.seq_repr_dim, interaction_hidden_dim), nn.ReLU(), nn.Dropout(dropout))
             self.graph_proj = nn.Sequential(nn.Linear(self.graph_repr_dim, interaction_hidden_dim), nn.ReLU(), nn.Dropout(dropout))
@@ -637,12 +630,12 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
         else:
             raise ValueError(f"Unknown fusion_strategy: {self.fusion_strategy}")
 
-        # 根据 use_evidential 选择预测头
+        #Choose prediction head according to use_evidential
         if self.use_evidential:
-            # Evidential预测头 (输出不确定性)
+            # Evidential
             self.predictor = EvidentialLayer(fusion_input_dim, hidden_dim=512)
         else:
-            # 普通MLP预测头 (用于MSE损失)
+            # MLP
             self.predictor = nn.Sequential(
                 nn.Linear(fusion_input_dim, 512),
                 nn.ReLU(),
@@ -740,7 +733,7 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
         edge_feat = graph.edata.get('dist', None)
         x = F.relu(self.input_proj(x))
 
-        # GNN层
+        # GNN
         for i in range(self.num_gnn_layers):
             if self.conv_type == 'schnet':
                 x_new = self.gnn_convs[i](graph, x, edge_feat)
@@ -751,34 +744,33 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
             x_new = F.dropout(x_new, p=self.dropout, training=self.training)
             x = x + x_new
 
-        # Transformer层 (可选)
+        # Transformer (has been deprecated)
         if self.use_transformer and self.transformer_layers is not None:
             for transformer_layer in self.transformer_layers:
                 x = transformer_layer(graph, x)
 
         struct_repr = self._graph_pooling(graph, x)
 
-        # ========== LM 消融模式：只使用结构表示 ==========
+        # ========== LM ablation mode: only use structural representation ==========
         if not self.use_lm:
-            # 结构表示投影
+            # Structural representation projection
             struct_feat = self.struct_proj(struct_repr)
 
-            # 处理额外特征
+            # Process extra features
             if self.has_extra_features and hasattr(graph, 'extra_features') and graph.extra_features is not None:
                 feature_repr = self.feature_mlp(graph.extra_features)
-                # 根据 interaction_type 融合结构 + 额外特征
+                # Fuse structure + extra features according to interaction_type
                 if hasattr(self, 'struct_feat_interaction') and self.struct_feat_interaction is not None:
                     if self.interaction_type == 'cross_attention':
                         struct_attended, feat_attended = self.struct_feat_interaction(struct_feat, feature_repr)
                         final_fused = torch.cat([struct_attended, feat_attended], dim=1)
                     elif self.interaction_type == 'bilinear':
                         final_fused = self.struct_feat_interaction(struct_feat, feature_repr)
-                else:  # concat - 直接拼接
+                else:  # concat 
                     final_fused = torch.cat([struct_feat, feature_repr], dim=1)
             else:
                 final_fused = struct_feat
 
-            # 预测
             if self.use_evidential:
                 gamma, nu, alpha, beta = self.predictor(final_fused)
                 pred = gamma.squeeze(-1)
@@ -791,13 +783,13 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
                 pred = self.predictor(final_fused)
                 return pred.squeeze(-1)
 
-        # ========== 正常模式：使用序列 + 结构 融合 ==========
+        # ========== seq + struc ==========
         if self.tokenizer is not None and self.pretrained_lm is not None:
             from utils import get_lm_embedding_
             seq_repr = get_lm_embedding_(seqs_al=seq_encoded, tokenizer=self.tokenizer, pretrained_lm=self.pretrained_lm, use_lm=True)
             seq_repr = seq_repr.mean(dim=1)
         else:
-            # LM未设置但use_lm=True，使用zero placeholder (不应该发生)
+            # LM is not set but use_lm=True, use zero placeholder (should not happen)
             batch_size = struct_repr.shape[0]
             seq_repr = torch.zeros(batch_size, self.seq_repr_dim, device=struct_repr.device)
 
@@ -815,9 +807,8 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
         elif self.fusion_strategy == 'parallel':
             final_fused = self._forward_parallel(seq_repr, struct_repr, feature_repr)
 
-        # 根据 use_evidential 选择预测方式
         if self.use_evidential:
-            # Evidential预测
+            # Evidential
             gamma, nu, alpha, beta = self.predictor(final_fused)
             pred = gamma.squeeze(-1)
 
@@ -827,7 +818,7 @@ class HybridMultiGrainGNN_Evidential(nn.Module):
                 return pred, aleatoric, epistemic, (gamma, nu, alpha, beta)
             return pred
         else:
-            # 普通MLP预测
+            # MLP
             pred = self.predictor(final_fused)
             return pred.squeeze(-1)
 
