@@ -1,7 +1,3 @@
-"""
-评估脚本 - 加载训练好的权重在测试集上评估
-"""
-
 import torch
 import torch.nn.functional as F
 from dgl.dataloading import GraphDataLoader
@@ -200,7 +196,7 @@ def evaluate(args):
     print("model evaluate")
     print("=" * 60)
 
-    print(f"\n加载检查点: {args.checkpoint}")
+    print(f"\nload: {args.checkpoint}")
     checkpoint, saved_config = load_checkpoint_with_config(args.checkpoint)
 
     exp_dir = os.path.dirname(os.path.dirname(args.checkpoint))
@@ -319,29 +315,30 @@ def evaluate(args):
 
     # load
     model.load_state_dict(checkpoint['model_state_dict'])
-    print(f"模型权重已加载")
-    print(f"总参数量: {sum(p.numel() for p in model.parameters()):,}")
+    print(f"Model weights loaded")
+    print(f"Total number of parameters: {sum(p.numel() for p in model.parameters()):,}")
 
-    # ========== 评估 ==========
-    # 定义不同的batch_size列表
+    # ========== Evaluation ==========
+    # Define a list of different batch sizes
     batch_sizes = [32, 64, 96, 128, 160, 192, 224, 256, 288, 320]
     num_runs = len(batch_sizes)
 
     print("\n" + "=" * 60)
-    print(f"开始评估 (共 {num_runs} 次, 不同batch_size)")
+    print(f"Starting evaluation ({num_runs} runs in total, with different batch sizes)")
     print("=" * 60)
+
 
     if use_multigrain:
         eval_fn = evaluate_multi_grain
     else:
         eval_fn = evaluate_single_grain
 
-    # 多次评估
     all_metrics = []
     all_preds_list = []
 
     for run_idx, batch_size in enumerate(batch_sizes):
-        print(f"\n--- 第 {run_idx + 1}/{num_runs} 次评估 (batch_size={batch_size}) ---")
+        print(f"\n--- Evaluation {run_idx + 1}/{num_runs} (batch_size={batch_size}) ---")
+
 
         run_loader = GraphDataLoader(
             test_dataset,
@@ -357,7 +354,6 @@ def evaluate(args):
 
         print(f"  MSE: {metrics['mse']:.4f} | RMSE: {metrics['rmse']:.4f} | MAE: {metrics['mae']:.4f} | R2: {metrics['r2']:.4f} | Pearson: {metrics['pearson']:.4f} | Spearman: {metrics['spearman']:.4f} | Recall@50: {metrics['recall_at_50']:.4f}")
 
-    # 计算平均值和标准差
     avg_metrics = {}
     std_metrics = {}
     metric_keys = all_metrics[0].keys()
@@ -368,19 +364,20 @@ def evaluate(args):
         std_metrics[key] = np.std(values)
 
     print("\n" + "=" * 60)
-    print(f"评估结果汇总 ({num_runs} 次, batch_sizes: {batch_sizes})")
+    print(f"Evaluation Results Summary ({num_runs} runs, batch_sizes: {batch_sizes})")
     print("=" * 60)
-    print(f"\n{'指标':<12} {'平均值':<12} {'标准差':<12}")
+    print(f"\n{'Metric':<12} {'Mean':<12} {'Std Dev':<12}")
     print("-" * 36)
     for key in ['rmse', 'r2', 'pearson', 'spearman', 'recall_at_50', 'mse', 'mae']:
         if key in avg_metrics:
             print(f"{key.upper():<12} {avg_metrics[key]:<12.4f} {std_metrics[key]:<12.4f}")
 
-    # ========== 保存结果 ==========
+    # ========== Save Results ==========
+
     if args.output_dir:
         os.makedirs(args.output_dir, exist_ok=True)
 
-        # 保存每次评估的详细结果
+        # Save detailed results for each evaluation run
         all_runs_path = os.path.join(args.output_dir, 'all_runs_metrics.json')
         all_runs_data = {
             'num_runs': num_runs,
@@ -394,17 +391,18 @@ def evaluate(args):
         }
         with open(all_runs_path, 'w', encoding='utf-8') as f:
             json.dump(all_runs_data, f, indent=2)
-        print(f"\n所有评估结果已保存: {all_runs_path}")
+        print(f"\nAll evaluation results have been saved: {all_runs_path}")
 
-        # 保存最后一次的预测结果
+        # Save the prediction results from the last run
         pred_path = os.path.join(args.output_dir, 'predictions.txt')
         with open(pred_path, 'w', encoding='utf-8') as f:
             f.write("Target\tPrediction\n")
             for target, pred in zip(targets, preds):
                 f.write(f"{target:.4f}\t{pred:.4f}\n")
-        print(f"预测结果已保存: {pred_path}")
+        print(f"Prediction results have been saved: {pred_path}")
 
-        # 保存汇总指标
+
+        # Save summary metrics
         metrics_path = os.path.join(args.output_dir, 'metrics_summary.json')
         summary = {
             'num_runs': num_runs,
@@ -414,19 +412,20 @@ def evaluate(args):
         }
         with open(metrics_path, 'w', encoding='utf-8') as f:
             json.dump(summary, f, indent=2)
-        print(f"汇总指标已保存: {metrics_path}")
+        print(f"Summary metrics have been saved: {metrics_path}")
 
-        # 绘制预测图 (使用最后一次的预测)
+        # Plot predictions (using the predictions from the last run)
         try:
             from utils import plot_predictions
             plot_path = os.path.join(args.output_dir, 'predictions.png')
             plot_predictions(preds, targets, plot_path)
-            print(f"预测图已保存: {plot_path}")
+            print(f"Prediction plot has been saved: {plot_path}")
         except Exception as e:
-            print(f"绘图失败: {e}")
+            print(f"Plotting failed: {e}")
+
 
     print("\n" + "=" * 60)
-    print("评估完成!")
+    print("finish!")
     print("=" * 60)
 
     return avg_metrics, std_metrics
@@ -435,18 +434,16 @@ def evaluate(args):
 def main():
     parser = argparse.ArgumentParser(description='evaluation')
 
-    # 必需参数
     parser.add_argument('--checkpoint', type=str,default='./checkpoint/best_model_10.pt',
-                        help='检查点文件路径 (best_model.pt)')
+                        help='Path to checkpoint file (best_model.pt)')
 
-    # 数据参数
     parser.add_argument('--test_csv', type=str, default='data/0_93__10_structure/test.csv',#data/0_9__5/test.csv
                         help='test set CSV')
     parser.add_argument('--pdb_dir', type=str, default='pdb',
                         help='PDB')
     parser.add_argument('--distance_threshold', type=float, default=8.0)
 
-    # 模型参数 (如果checkpoint中没有保存配置，则使用这些默认值)
+    # Model arguments (if config is not saved in checkpoint, use these defaults)
     parser.add_argument('--use_multigrain', action='store_true', default=True)
     parser.add_argument('--model_type', type=str, default='cross_attention')
     parser.add_argument('--tech', type=str, default='_evidential')
@@ -459,30 +456,25 @@ def main():
     parser.add_argument('--interaction_dim', type=int, default=256)
     parser.add_argument('--fusion_strategy', type=str, default='structure_enhanced')
 
-    # Transformer/Evidential参数 (与train.py保持一致)
     parser.add_argument('--use_evidential', action='store_true', default=False,
-                        help='使用Evidential不确定性量化 (仅 tech=_evidential 时有效)')
+                        help='Use Evidential uncertainty quantification (only effective when tech=_evidential)')
     parser.add_argument('--conv_type', type=str, default='graphconv',
-                        choices=['graphconv'],
-                        help='图卷积类型')
+                        choices=['graphconv'])
 
-    # 评估参数
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--num_workers', type=int, default=0)
     parser.add_argument('--num_runs', type=int, default=10,
-                        help='评估次数 (默认10次，计算平均值和标准差)')
+                        help='Number of evaluation runs (default: 10, with mean and standard deviation calculated)')
 
-    # 输出参数
     parser.add_argument('--output_dir', type=str, default=None,
-                        help='输出目录 (保存预测结果和指标)')
+                        help='output directory.')
 
-    # 其他
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--gpu_id', type=int, default=0)
 
     args = parser.parse_args()
 
-    # 如果没有指定output_dir，使用checkpoint所在目录
+    # If output_dir is not specified, use the directory of the checkpoint
     if args.output_dir is None:
         args.output_dir = os.path.dirname(args.checkpoint)
 
