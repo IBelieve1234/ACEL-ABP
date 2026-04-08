@@ -45,7 +45,6 @@ def set_seed(seed=42):
         torch.use_deterministic_algorithms(True)
     except:
         pass
-    # DGL 随机种子
     try:
         import dgl
         dgl.seed(seed)
@@ -280,7 +279,6 @@ class Logger:
 
 def normalize_features(features, mean=None, std=None):
     """
-    标准化特征
 
     Args:
         features: numpy array or torch tensor
