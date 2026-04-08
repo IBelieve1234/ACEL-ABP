@@ -379,16 +379,6 @@ class GraphTransformerLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, g, x, pe=None):
-        """
-        Args:
-            g: DGL图 (保留用于未来扩展，如边特征)
-            x: 节点特征 [num_nodes, hidden_dim]
-            pe: 位置编码 [num_nodes, hidden_dim] (可选)
-
-        Returns:
-            x: 更新后的节点特征
-        """
-        # 加入位置编码
         if pe is not None:
             x = x + pe
 
@@ -400,7 +390,7 @@ class GraphTransformerLayer(nn.Module):
         qkv = self.qkv(x).reshape(B, 3, self.num_heads, self.head_dim)
         q, k, v = qkv[:, 0], qkv[:, 1], qkv[:, 2]
 
-        # Attention计算
+        # Attention
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = F.softmax(attn, dim=-1)
         attn = self.dropout(attn)
@@ -419,8 +409,6 @@ class GraphTransformerLayer(nn.Module):
         return x
 
 
-# ============= 工厂函数 =============
-
 def get_model(
     use_multigrain=False,
     model_type='base',
@@ -428,34 +416,6 @@ def get_model(
     ablation_tech=None,
     **kwargs
 ):
-    """
-    统一模型创建函数
-
-    Args:
-        use_multigrain: 是否多粒度模式
-        model_type:
-            - 单粒度: 'base', 'hybrid', 'simple', 'schnet', 'gat'
-            - 多粒度: 'cross_attention', 'bilinear', 'concat'
-        use_extra_features: 是否使用手工特征（仅多粒度模式有效）
-        ablation_tech: 消融实验技术
-            - 'transformer_evidential': Transformer + Evidential (唯一支持的消融模型)
-            - None: 不使用消融模型
-        **kwargs: 模型参数
-
-    Returns:
-        model
-
-    Examples:
-        # 消融实验: Transformer + Evidential
-        >>> model = get_model(use_multigrain=True, use_extra_features=True,
-        ...                   ablation_tech='transformer_evidential', model_type='cross_attention')
-
-        # 多粒度 + 手工特征
-        >>> model = get_model(use_multigrain=True, use_extra_features=True,
-        ...                   model_type='cross_attention')
-    """
-
-    # 消融实验模型
     if ablation_tech is not None:
         if not use_multigrain:
             raise ValueError("ablation_tech requires use_multigrain=True")
