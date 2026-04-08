@@ -1,0 +1,11 @@
+torch
+dgl
+numpy
+pandas
+scipy
+biopython
+transformers
+fair-esm
+matplotlib
+tqdm
+tmtools
