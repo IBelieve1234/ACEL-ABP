@@ -146,7 +146,7 @@ Under `--output_dir`:
 ## 7. Notes and Known Caveats
 
 1. `train.py` and `eval.py` hardcode the PLM base path as:
-- `./llm/`
+   `./llm/`
    The PLMs are from https://huggingface.co/Rostlab and https://github.com/facebookresearch/esm
    Update this path in code if your local model files are elsewhere.
 3. The grampa_s_aureus_7_25_with_GRAMPA.csv are from [AMPCliff-generation/data/grampa_s_aureus_7_25.csv at main · Kewei2023/AMPCliff-generation](https://github.com/Kewei2023/AMPCliff-generation/blob/main/data/grampa_s_aureus_7_25.csv)
