@@ -700,7 +700,7 @@ def main():
     parser.add_argument('--fusion_strategy', type=str, default='structure_enhanced',
                         choices=['late', 'structure_enhanced', 'early', 'parallel'])
 
-    # ========== Transformer/Evidential Parameters ==========
+    # ========== Evidential Parameters ==========
     parser.add_argument('--use_evidential', action='store_true', default=True,
                         help='Use evidential uncertainty quantification')
     parser.add_argument('--use_lm', type=lambda x: str(x).lower() in ('true', '1', 'yes'), default=True,
