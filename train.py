@@ -30,7 +30,7 @@ from utils import (
 def load_language_model(lm_model, device):
     print(f"\nload llm: {lm_model}")
 
-    # 导入transformers
+    # transformers
     from transformers import (
         BertModel, BertTokenizer,
         T5Tokenizer, T5EncoderModel,
@@ -299,32 +299,32 @@ def train(args):
 
     logger = Logger(os.path.join(dirs['logs_dir'], 'train.log'))
     logger.log(f"\n{'='*60}")
-    logger.log(f"训练模式: {'多粒度' if args.use_multigrain else '单粒度'}")
-    logger.log(f"实验名称: {exp_name}")
+    logger.log(f"Training Mode: {'Multi-Granularity' if args.use_multigrain else 'Single-Granularity'}")
+    logger.log(f"Experiment Name: {exp_name}")
     logger.log(f"{'='*60}\n")
 
     saved_files = save_code_snapshot(dirs['exp_dir'])
-    logger.log(f"代码快照已保存: {saved_files}")
+    logger.log(f"Code snapshot saved: {saved_files}")
 
-    # 获取设备
+
     device = get_device(args.gpu_id)
 
-    # ========== 加载语言模型 (仅多粒度且use_lm=True) ==========
     tokenizer, pretrained_lm = None, None
     if args.use_multigrain and args.use_lm:
         logger.log("\n" + "="*60)
-        logger.log("加载预训练语言模型")
+        logger.log("Loading Pretrained Language Model")
         logger.log("="*60)
         tokenizer, pretrained_lm = load_language_model(args.lm_model, device)
     elif args.use_multigrain and not args.use_lm:
         logger.log("\n" + "="*60)
-        logger.log("[消融实验] 不使用语言模型 (--use_lm False)")
+        logger.log("[Ablation Study] Language Model Disabled (--use_lm False)")
         logger.log("="*60)
 
-    # ========== 加载数据集 ==========
+    # ========== Load Dataset ==========
     logger.log("\n" + "="*60)
-    logger.log("加载数据集")
+    logger.log("Loading Dataset")
     logger.log("="*60)
+
 
     train_dataset = PeptideMICDataset(
         csv_file=args.train_csv,
@@ -342,8 +342,8 @@ def train(args):
         use_multigrain=args.use_multigrain
     )
 
-    logger.log(f"训练集: {len(train_dataset)} 样本")
-    logger.log(f"测试集: {len(test_dataset)} 样本")
+    logger.log(f"train set: {len(train_dataset)} samples")
+    logger.log(f"test set: {len(test_dataset)} samples")
 
     # DataLoader
     collate = get_collate_fn(
@@ -385,9 +385,10 @@ def train(args):
 
     if args.model_type in ['base', 'hybrid'] or args.use_multigrain:
         model_kwargs['conv_type'] = args.conv_type
-        print(f"[DEBUG] 已添加 conv_type={args.conv_type} 到 model_kwargs")
+        print(f"[DEBUG] Added conv_type={args.conv_type} to model_kwargs")
     else:
-        print(f"[DEBUG] 当前配置不需要 conv_type")
+        print(f"[DEBUG] Current configuration does not require conv_type")
+
 
     if args.use_multigrain:
         lm_hidden_dims = {
@@ -401,7 +402,7 @@ def train(args):
             'esm2_t33_650M_UR50D': 1280,
         }
         lm_hidden_dim = lm_hidden_dims.get(args.lm_model, 1024)
-        logger.log(f"语言模型隐藏维度: {lm_hidden_dim}")
+        logger.log(f"Language Model Hidden Dimension: {lm_hidden_dim}")
         model_kwargs.update({
             'graph_input_dim': args.input_dim,
             'graph_hidden_dim': args.hidden_dim,
@@ -414,13 +415,13 @@ def train(args):
 
         if args.conv_type == 'gat':
             model_kwargs['num_heads'] = 4
-            logger.log(f"GAT卷积参数: num_heads=4")
+            logger.log(f"GAT Convolution Parameter: num_heads=4")
 
         model_kwargs['fusion_strategy'] = args.fusion_strategy
         model_kwargs['use_evidential'] = args.use_evidential
-        logger.log(f"融合策略: {args.fusion_strategy}")
-        logger.log(f"使用语言模型(LM): {args.use_lm}")
-        logger.log(f"使用 Evidential: {args.use_evidential}")
+        logger.log(f"Fusion Strategy: {args.fusion_strategy}")
+        logger.log(f"Use Language Model (LM): {args.use_lm}")
+        logger.log(f"Use Evidential: {args.use_evidential}")
     else:
         extra_dim = 0
 
@@ -435,7 +436,7 @@ def train(args):
             })
             if args.conv_type == 'gat':
                 model_kwargs['num_heads'] = 4
-                logger.log(f"HybridGNN使用GAT卷积: num_heads=4")
+                logger.log(f"HybridGNN use GAT: num_heads=4")
         else:
             model_kwargs.update({
                 'input_dim': args.input_dim,
@@ -446,11 +447,11 @@ def train(args):
                 model_kwargs['pooling'] = args.pooling
             if args.model_type in ['gat', 'simple_gat']:
                 model_kwargs['num_heads'] = 4
-                logger.log(f"GAT模型参数: num_heads=4")
+                logger.log(f"GAT: num_heads=4")
 
     tech_value = None if args.tech == 'none' else args.tech
 
-    print(f"[DEBUG] 创建模型前 model_kwargs = {model_kwargs}")
+    print(f"[DEBUG] model_kwargs = {model_kwargs}")
     print(f"[DEBUG] tech = {tech_value}")
     model = get_model(
         use_multigrain=args.use_multigrain,
@@ -464,59 +465,55 @@ def train(args):
     if args.use_multigrain and args.use_lm:
         model.set_language_model(tokenizer, pretrained_lm)
 
-    logger.log(f"模型类型: {args.model_type}")
-    logger.log(f"总参数量: {sum(p.numel() for p in model.parameters()):,}")
-    logger.log(f"可训练参数: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
+    logger.log(f"Model Type: {args.model_type}")
+    logger.log(f"Total Parameters: {sum(p.numel() for p in model.parameters()):,}")
+    logger.log(f"Trainable Parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
-    # 保存配置（包含实际使用的模型类名）
     config_dict = vars(args).copy()
     config_dict['actual_model_class'] = model.__class__.__name__
 
     config_path = os.path.join(dirs['exp_dir'], 'config.json')
     with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(config_dict, f, indent=2, ensure_ascii=False)
-    logger.log(f"\n配置已保存: {config_path}")
-    logger.log(f"  实际使用模型: {model.__class__.__name__}")
+    logger.log(f"\nConfiguration saved: {config_path}")
+    logger.log(f"  Actual Model Used: {model.__class__.__name__}")
 
-    # 保存模型配置（用于checkpoint）
     model_config = {
         'use_multigrain': args.use_multigrain,
         'model_type': args.model_type,
         **model_kwargs
     }
 
-    # ========== 损失函数 ==========
+    # ========== Loss Function ==========
     logger.log("\n" + "="*60)
-    logger.log("配置损失函数")
+    logger.log("Configuring Loss Function")
     logger.log("="*60)
 
     criterion = None
 
-    # 判断是否应该使用Evidential损失
-    # 条件: loss_type == 'evidential' 且 use_evidential == True
     should_use_evidential_loss = False
     if args.loss_type == 'evidential' and args.use_evidential:
         should_use_evidential_loss = True
 
     if should_use_evidential_loss:
         criterion = EvidentialRegressionLoss(coeff=args.evidential_coeff)
-        logger.log(f"损失函数: Evidential (coeff={args.evidential_coeff})")
+        logger.log(f"loss: Evidential (coeff={args.evidential_coeff})")
     elif args.loss_type == 'focal':
         criterion = FocalRegressionLoss(gamma=args.focal_gamma, loss_type=args.focal_loss_base)
-        logger.log(f"损失函数: Focal (gamma={args.focal_gamma}, base={args.focal_loss_base})")
+        logger.log(f"loss: Focal (gamma={args.focal_gamma}, base={args.focal_loss_base})")
     elif args.loss_type == 'mae':
         criterion = F.l1_loss
-        logger.log("损失函数: MAE")
+        logger.log("loss: MAE")
     else:
         criterion = F.mse_loss
-        logger.log("损失函数: MSE")
+        logger.log("loss: MSE")
 
-    # ========== 优化器和调度器 ==========
-    # Evidential模型推荐更小的学习率
+    # ========== Optimizer and Scheduler ==========
+    # A smaller learning rate is recommended for Evidential models
     effective_lr = args.lr
     if should_use_evidential_loss:
-        #effective_lr = min(args.lr, 5e-4)
-        logger.log(f"检测到Evidential模式，调整学习率: {args.lr} -> {effective_lr}")
+        logger.log(f"Evidential mode detected, adjusting learning rate: {args.lr} -> {effective_lr}")
+
 
     optimizer = torch.optim.Adam(
         model.parameters(),
@@ -546,16 +543,15 @@ def train(args):
         mode='min'
     ) if args.early_stop else None
 
-    # ========== 训练循环 ==========
+    # ==========train ==========
     logger.log("\n" + "="*60)
-    logger.log("开始训练")
+    logger.log("Starting Training")
     logger.log("="*60 + "\n")
 
     best_rmse = float('inf')
     train_losses = []
     val_losses = []
 
-    # 选择训练和评估函数
     if args.use_multigrain:
         train_fn = train_epoch_multi_grain
         eval_fn = evaluate_multi_grain
@@ -567,13 +563,11 @@ def train(args):
         logger.log(f"\nEpoch [{epoch}/{args.num_epochs}]")
         logger.log("-" * 60)
 
-        # 训练
         train_loss = train_fn(model, train_loader, optimizer, device, epoch,
                              criterion=criterion)
         train_losses.append(train_loss)
         logger.log(f"  Train Loss: {train_loss:.4f} | LR: {get_lr(optimizer):.6f}")
 
-        # 评估
         should_eval = (epoch % args.eval_interval == 0) or (epoch == args.num_epochs)
 
         if should_eval:
@@ -582,43 +576,40 @@ def train(args):
 
             logger.log(f"  Test  {format_metrics(test_metrics, prefix='')}")
 
-            # 更新调度器
             if scheduler is not None:
                 if args.scheduler == 'plateau':
                     scheduler.step(test_metrics['rmse'])
                 else:
                     scheduler.step()
 
-            # 保存最佳模型
             is_best = test_metrics['rmse'] < best_rmse
             if is_best:
                 best_rmse = test_metrics['rmse']
                 best_checkpoint_path = os.path.join(dirs['checkpoints_dir'], 'best_model.pt')
                 save_checkpoint(model, optimizer, epoch, test_metrics, best_checkpoint_path, model_config)
-                logger.log(f"  [BEST] 新的最佳RMSE: {best_rmse:.4f}")
+                logger.log(f"  [BEST] new best RMSE: {best_rmse:.4f}")
 
-            # 早停
+            
             if early_stopping is not None:
                 early_stopping(test_metrics['rmse'])
                 if early_stopping.early_stop:
-                    logger.log(f"\n早停触发! 最佳RMSE: {best_rmse:.4f}")
+                    logger.log(f"\nEarly stopping triggered! Best RMSE: {best_rmse:.4f}")
                     break
 
-            # RMSE阈值检查: 如果到达指定epoch后RMSE仍不理想，提前终止
+            # RMSE threshold check: if RMSE is still unsatisfactory after the specified epoch, terminate early
             if args.rmse_threshold_epoch > 0 and epoch >= args.rmse_threshold_epoch:
                 if best_rmse > args.rmse_threshold:
-                    logger.log(f"\nRMSE阈值检查: {args.rmse_threshold_epoch}个epoch后, 最佳RMSE={best_rmse:.4f} > 阈值{args.rmse_threshold}")
-                    logger.log(f"训练效果不理想, 提前终止!")
+                    logger.log(f"\nRMSE threshold check: after {args.rmse_threshold_epoch} epochs, best RMSE={best_rmse:.4f} > threshold {args.rmse_threshold}")
+                    logger.log(f"Training performance is unsatisfactory, terminating early!")
                     break
 
-        # 定期保存
+
         if args.save_interval > 0 and epoch % args.save_interval == 0:
             checkpoint_path = os.path.join(dirs['checkpoints_dir'], f'checkpoint_epoch_{epoch}.pt')
             save_checkpoint(model, optimizer, epoch, {'epoch': epoch}, checkpoint_path, model_config)
 
-    # ========== 最终评估 ==========
     logger.log("\n" + "="*60)
-    logger.log("最终评估")
+    logger.log("Final Evaluation")
     logger.log("="*60)
 
     best_checkpoint_path = os.path.join(dirs['checkpoints_dir'], 'best_model.pt')
@@ -629,18 +620,16 @@ def train(args):
             model, test_loader, device, return_predictions=True
         )
 
-        logger.log(f"\n最终测试集性能:")
+        logger.log(f"\nFinal Test Set Performance:")
         logger.log(format_metrics(test_metrics, prefix=''))
 
-        # 保存预测
         results_path = os.path.join(dirs['exp_dir'], 'predictions.txt')
         with open(results_path, 'w', encoding='utf-8') as f:
             f.write("Target\tPrediction\n")
             for target, pred in zip(test_targets, test_preds):
                 f.write(f"{target:.4f}\t{pred:.4f}\n")
-        logger.log(f"\n预测结果已保存: {results_path}")
+        logger.log(f"\nPrediction results saved: {results_path}")
 
-        # 绘图
         if len(val_losses) > 0:
             plot_training_curves(
                 train_losses[::args.eval_interval],
@@ -655,9 +644,10 @@ def train(args):
         )
 
     logger.log("\n" + "="*60)
-    logger.log("训练完成!")
-    logger.log(f"实验目录: {dirs['exp_dir']}")
+    logger.log("Training completed!")
+    logger.log(f"Experiment directory: {dirs['exp_dir']}")
     logger.log("="*60 + "\n")
+
 
 
 def main():
@@ -675,29 +665,29 @@ def main():
     --loss_type mae            
 
     """
-    parser = argparse.ArgumentParser(description='统一训练脚本 - 支持单粒度和多粒度')
+    parser = argparse.ArgumentParser(description='training script for peptide MIC prediction')
 
-    # ========== 核心参数 ==========
-    parser.add_argument('--use_multigrain', action='store_true', default=True,  
-                        help='默认启用')
-    parser.add_argument('--tech', type=str, default='transformer_evidential',  #实际上无transformer层
+    # ========== Arguments ==========
+    parser.add_argument('--use_multigrain', action='store_true', default=True,
+                        help='Enabled by default')
+    parser.add_argument('--tech', type=str, default='transformer_evidential',  # actually no transformer layer
                         choices=['transformer_evidential', 'node_level_fusion', 'none'],
-                        help='模型技术选择:\n'
-                             '  transformer_evidential: 使用 HybridMultiGrainGNN_Evidential (ACEL-ABP)\n')
+                        help='Model technique selection:\n'
+                            '  transformer_evidential: use HybridMultiGrainGNN_Evidential (ACEL-ABP)\n')
 
-    # ========== 数据参数 ==========
+    # ========== Data Arguments ==========
     parser.add_argument('--train_csv', type=str, default='data/0_93__10_structure/train.csv')
-                                                                               
+
     parser.add_argument('--test_csv', type=str, default='data/0_93__10_structure/test.csv')
-                                                                                
+
     parser.add_argument('--pdb_dir', type=str, default='pdb')
     parser.add_argument('--distance_threshold', type=float, default=8.0)
 
 
-    # ========== 模型参数 ==========
+    # ========== Model Parameters ==========
     parser.add_argument('--model_type', type=str, default='cross_attention', #
-                        help='模型类型:\n'
-                             '  多粒度: cross_attention, concat')
+                        help='Model type:\n'
+                            '  Multi-granularity: cross_attention, concat')
     parser.add_argument('--input_dim', type=int, default=60)
     parser.add_argument('--hidden_dim', type=int, default=128)
     parser.add_argument('--num_layers', type=int, default=3)
@@ -706,45 +696,46 @@ def main():
                         choices=['mean', 'sum', 'mean_sum', 'max'])
     parser.add_argument('--conv_type', type=str, default='graphconv')
     parser.add_argument('--interaction_dim', type=int, default=256,
-                        help='交互层维度 (多粒度模式使用)')
-    parser.add_argument('--fusion_strategy', type=str, default='structure_enhanced',                     
+                        help='Interaction layer dimension (used in multi-granularity mode)')
+    parser.add_argument('--fusion_strategy', type=str, default='structure_enhanced',
                         choices=['late', 'structure_enhanced', 'early', 'parallel'])
 
-    # ========== Transformer/Evidential参数 ==========
-    parser.add_argument('--use_evidential', action='store_true', default=True,                            
-                        help='使用Evidential不确定性量化')
-    parser.add_argument('--use_lm', type=lambda x: str(x).lower() in ('true', '1', 'yes'), default=True, 
-                        help='是否使用预训练语言模型 (默认True, 设False进行消融)')
-    # ========== 语言模型参数 (仅多粒度) ==========
-    parser.add_argument('--lm_model', type=str, default='prot_t5_xl_uniref50',                            
+    # ========== Transformer/Evidential Parameters ==========
+    parser.add_argument('--use_evidential', action='store_true', default=True,
+                        help='Use evidential uncertainty quantification')
+    parser.add_argument('--use_lm', type=lambda x: str(x).lower() in ('true', '1', 'yes'), default=True,
+                        help='Whether to use a pretrained language model (default: True; set to False for ablation)')
+    # ========== Language Model Parameters (multi-granularity only) ==========
+    parser.add_argument('--lm_model', type=str, default='prot_t5_xl_uniref50',
                         choices=['prot_bert_bfd', 'prot_bert', 'prot_t5_xl_bfd',
                                 'prot_t5_xl_uniref50', 'prot_xlnet', 'ProstT5',
                                 'esm2_t6_8M_UR50D', 'esm2_t33_650M_UR50D'])
-    parser.add_argument('--loss_type', type=str, default='evidential',                                   
+    parser.add_argument('--loss_type', type=str, default='evidential',
                         choices=['mse', 'mae', 'focal', 'evidential'],
-                        help='损失函数类型:\n'
-                             '  mse: 标准均方误差\n'
-                             '  focal: Focal回归损失 (聚焦难样本)\n'
-                             '  evidential: Evidential损失 (不确定性量化)')
-    parser.add_argument('--evidential_coeff', type=float, default=0.01,                                   #可以固定 
-                        help='Evidential损失正则化系数 (0.001-0.1)')
-    parser.add_argument('--focal_gamma', type=float, default=2.0,                                         #可以固定
-                        help='Focal损失gamma参数 (1.0-5.0)')
+                        help='Loss function type:\n'
+                            '  mse: standard mean squared error\n'
+                            '  focal: focal regression loss (focuses on hard samples)\n'
+                            '  evidential: evidential loss (uncertainty quantification)')
+    parser.add_argument('--evidential_coeff', type=float, default=0.01,  # can be fixed
+                        help='Regularization coefficient for evidential loss (0.001-0.1)')
+    parser.add_argument('--focal_gamma', type=float, default=2.0,  # can be fixed
+                        help='Gamma parameter for focal loss (1.0-5.0)')
 
-    parser.add_argument('--focal_loss_base', type=str, default='mse',                                     #可以固定
+    parser.add_argument('--focal_loss_base', type=str, default='mse',  # can be fixed
                         choices=['mse', 'mae', 'huber'],
-                        help='Focal损失的基础损失类型')
+                        help='Base loss type for focal loss')
 
-    # ========== 训练参数 ==========
+
+    # ========== Training Parameters ==========
     parser.add_argument('--num_epochs', type=int, default=200)
-    parser.add_argument('--batch_size', type=int, default=32,#32
-                        help='批次大小 (多粒度建议16)')
-    parser.add_argument('--lr', type=float, default=0.0005) #0.001   0.0005                                #可以固定
+    parser.add_argument('--batch_size', type=int, default=32,  # 32
+                        help='Batch size (16 recommended for multi-granularity)')
+    parser.add_argument('--lr', type=float, default=0.0005)  # 0.001   0.0005  # can be fixed
     parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--eval_interval', type=int, default=1,
-                        help='评估间隔')
+                        help='Evaluation interval')
 
-    # ========== 调度器 ==========
+    # ========== Scheduler ==========
     parser.add_argument('--scheduler', type=str, default='plateau',
                         choices=['plateau', 'step', 'none'])
     parser.add_argument('--scheduler_patience', type=int, default=10)
@@ -752,47 +743,49 @@ def main():
     parser.add_argument('--scheduler_step_size', type=int, default=30)
     parser.add_argument('--scheduler_gamma', type=float, default=0.1)
 
-    # ========== 早停 ==========
+    # ========== Early Stopping ==========
     parser.add_argument('--early_stop', action='store_true', default=False)
     parser.add_argument('--early_stop_patience', type=int, default=20)
 
-    # ========== RMSE阈值检查 (自动调参用) ==========
+    # ========== RMSE Threshold Check (for automatic hyperparameter tuning) ==========
     parser.add_argument('--rmse_threshold', type=float, default=0.64,
-                        help='RMSE阈值，超过此值视为不理想')
+                        help='RMSE threshold; values above this are considered unsatisfactory')
     parser.add_argument('--rmse_threshold_epoch', type=int, default=0,
-                        help='在此epoch后检查RMSE阈值，0表示禁用 (默认0)')
+                        help='Check RMSE threshold after this epoch; 0 means disabled (default: 0)')
 
-    # ========== 保存参数 ==========
-    parser.add_argument('--save_dir', type=str, default='experiments_structure')# experiments  experiments_structure
-    parser.add_argument('--exp_name', type=str, default='transformer_evidential')#默认 无
+    # ========== Save Parameters ==========
+    parser.add_argument('--save_dir', type=str, default='experiments_structure')  # experiments  experiments_structure
+    parser.add_argument('--exp_name', type=str, default='transformer_evidential')  # default no
     parser.add_argument('--save_interval', type=int, default=0)
 
-    # ========== 其他 ==========
+    # ========== Other ==========
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--gpu_id', type=int, default=0)
     parser.add_argument('--num_workers', type=int, default=0)
 
     args = parser.parse_args()
 
-    # 参数检查
+
+    # Argument check
     if args.use_multigrain:
         if args.model_type not in ['cross_attention', 'bilinear', 'concat']:
-            print(f"[WARN] 警告: 多粒度模式下model_type应为cross_attention/bilinear/concat")
-            print(f"   当前: {args.model_type}, 自动切换为cross_attention")
+            print(f"[WARN] Warning: in multi-granularity mode, model_type should be cross_attention/bilinear/concat")
+            print(f"   Current: {args.model_type}, automatically switching to cross_attention")
             args.model_type = 'cross_attention'
     else:
-        if args.model_type not in ['base', 'hybrid', 'simple', 'schnet', 'gat']:
-            print(f"[WARN] 警告: 单粒度模式下model_type应为base/hybrid/simple/schnet/gat")
-            print(f"   当前: {args.model_type}, 自动切换为base")
+        if args.model_type not in ['base', 'hybrid']:
+            print(f"[WARN] Warning: in single-granularity mode, model_type should be base/hybrid")
+            print(f"   Current: {args.model_type}, automatically switching to base")
             args.model_type = 'base'
 
-    # 如果禁用 Evidential，自动切换损失函数为 MSE
+    # If Evidential is disabled, automatically switch the loss function to MSE
     if not args.use_evidential and args.loss_type == 'evidential':
         args.loss_type = 'mse'
-        print(f"[INFO] use_evidential=False，自动切换 loss_type 为 mse")
+        print(f"[INFO] use_evidential=False, automatically switching loss_type to mse")
 
-    # 开始训练
+    # Start training
     train(args)
+
 
 
 if __name__ == '__main__':
