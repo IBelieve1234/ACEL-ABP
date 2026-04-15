@@ -437,7 +437,7 @@ def main():
     parser.add_argument('--checkpoint', type=str,default='./checkpoint/best_model_10.pt',
                         help='Path to checkpoint file (best_model.pt)')
 
-    parser.add_argument('--test_csv', type=str, default='data/0_93__10_structure/test.csv',#data/0_9__5/test.csv
+    parser.add_argument('--test_csv', type=str, default='data/0_93__10_structure/test.csv',#data/0_9__10/test.csv
                         help='test set CSV')
     parser.add_argument('--pdb_dir', type=str, default='pdb',
                         help='PDB')
