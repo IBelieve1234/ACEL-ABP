@@ -1,5 +1,5 @@
 """
-从PDB文件提取序列并添加到CSV
+Extract sequences from PDB files and add them to a CSV
 """
 
 import pandas as pd
@@ -8,11 +8,11 @@ import os
 
 
 def extract_sequence_from_pdb(pdb_file):
-    """从PDB文件提取序列"""
+    """Extract sequence from a PDB file"""
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure('peptide', pdb_file)
 
-    # 三字母到单字母转换
+    # Convert three-letter residue codes to one-letter codes
     three_to_one = {
         'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D', 'CYS': 'C',
         'GLN': 'Q', 'GLU': 'E', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I',
@@ -33,23 +33,23 @@ def extract_sequence_from_pdb(pdb_file):
 
 def add_sequences_to_csv(csv_file, pdb_dir, output_file=None):
     """
-    从PDB文件提取序列并添加到CSV
+    Extract sequences from PDB files and add them to a CSV
 
     Args:
-        csv_file: 输入CSV文件路径
-        pdb_dir: PDB文件目录
-        output_file: 输出CSV文件路径(None则覆盖原文件)
+        csv_file: Path to the input CSV file
+        pdb_dir: Directory containing PDB files
+        output_file: Path to the output CSV file (None means overwrite the original file)
     """
-    print(f"读取CSV: {csv_file}")
+    print(f"Reading CSV: {csv_file}")
     df = pd.read_csv(csv_file)
 
-    print(f"总样本数: {len(df)}")
+    print(f"Total number of samples: {len(df)}")
 
-    # 检查是否已有Sequence列
+    # Check whether the Sequence column already exists
     if 'Sequence' in df.columns:
-        print("警告: CSV已包含Sequence列，将被覆盖")
+        print("Warning: The CSV already contains a Sequence column, which will be overwritten")
 
-    # 提取序列
+    # Extract sequences
     sequences = []
     failed_ids = []
 
@@ -58,7 +58,7 @@ def add_sequences_to_csv(csv_file, pdb_dir, output_file=None):
         pdb_file = os.path.join(pdb_dir, f"{pdb_id}.pdb")
 
         if not os.path.exists(pdb_file):
-            print(f"  警告: PDB文件不存在 - {pdb_id}")
+            print(f" Warning: PDB file does not exist - {pdb_id}")
             sequences.append('')
             failed_ids.append(pdb_id)
             continue
@@ -68,48 +68,48 @@ def add_sequences_to_csv(csv_file, pdb_dir, output_file=None):
             sequences.append(seq)
 
             if (idx + 1) % 100 == 0:
-                print(f"  已处理: {idx + 1}/{len(df)}")
+                print(f"  Processed:  {idx + 1}/{len(df)}")
 
         except Exception as e:
-            print(f"  错误: 提取序列失败 - {pdb_id}, {e}")
+            print(f"  Error: Failed to extract sequence - {pdb_id}, {e}")
             sequences.append('')
             failed_ids.append(pdb_id)
 
-    # 添加Sequence列
+    # Add Sequence column
     df['Sequence'] = sequences
 
-    # 移除失败的样本
+    # Remove failed samples
     if failed_ids:
-        print(f"\n警告: {len(failed_ids)} 个样本失败，将被移除:")
-        print(failed_ids[:10])  # 只打印前10个
+        print(f"\nWarning:  {len(failed_ids)} samples failed and will be removed:")
+        print(failed_ids[:10]) # Print only the first 10
         df = df[df['Sequence'] != '']
 
-    # 调整列顺序: ID, Sequence, value, Activity
+    # Reorder columns: ID, Sequence, value, Activity
     if 'value' in df.columns:
         df = df[['ID', 'Sequence', 'value', 'Activity']]
     else:
         df = df[['ID', 'Sequence', 'Activity']]
 
-    # 保存
+    # Save
     if output_file is None:
         output_file = csv_file
 
     df.to_csv(output_file, index=False)
-    print(f"\n✓ 已保存到: {output_file}")
-    print(f"✓ 成功处理: {len(df)} 个样本")
+    print(f"\n✓ Saved to:  {output_file}")
+    print(f"✓ Successfully processed: {len(df)} samples")
 
-    # 显示示例
-    print(f"\n示例 (前5行):")
+    # Show examples
+    print(f"\nExample (first 5 rows):")
     print(df.head())
 
 
 if __name__ == '__main__':
     import argparse
 
-    parser = argparse.ArgumentParser(description='从PDB提取序列并添加到CSV')
-    parser.add_argument('--csv', type=str, required=True, help='输入CSV文件')
-    parser.add_argument('--pdb_dir', type=str, default='pdb', help='PDB目录')
-    parser.add_argument('--output', type=str, default=None, help='输出CSV文件(默认覆盖原文件)')
+    parser = argparse.ArgumentParser(description='Extract sequences from PDB files and add them to a CSV')
+    parser.add_argument('--csv', type=str, required=True, help='Input CSV file')
+    parser.add_argument('--pdb_dir', type=str, default='pdb', help='PDB directory')
+    parser.add_argument('--output', type=str, default=None, help='Output CSV file (default: overwrite original file)')
 
     args = parser.parse_args()
 
