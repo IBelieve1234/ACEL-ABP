@@ -446,7 +446,7 @@ def main():
     # Model arguments (if config is not saved in checkpoint, use these defaults)
     parser.add_argument('--use_multigrain', action='store_true', default=True)
     parser.add_argument('--model_type', type=str, default='cross_attention')
-    parser.add_argument('--tech', type=str, default='_evidential')
+    parser.add_argument('--tech', type=str, default='transformer_evidential')
     parser.add_argument('--lm_model', type=str, default='prot_t5_xl_uniref50')
     parser.add_argument('--input_dim', type=int, default=60)
     parser.add_argument('--hidden_dim', type=int, default=128)
