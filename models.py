@@ -121,7 +121,6 @@ class BaseGNN(nn.Module):
         # pooling
         x_graph = self._graph_pooling(g, x)
 
-        # 预测
         x_graph = F.dropout(x_graph, p=self.dropout, training=self.training)
         x_graph = F.relu(self.fc1(x_graph))
         x_graph = F.dropout(x_graph, p=self.dropout, training=self.training)
