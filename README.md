@@ -1,8 +1,8 @@
-# ACEL-ABP: activity cliff-aware evidential deep learning for predicting antibacterial peptide activity
+# ACAEDL-AMP: activity-cliff-aware evidential deep learning for predicting the minimum inhibitory concentrations of antimicrobial peptides
 
 ## 1. Project Overview
 
-This repository provides code for "ACEL-ABP: activity cliff-aware evidential deep learning for predicting antibacterial peptide activity"
+This repository provides code for "ACAEDL-AMP: activity-cliff-aware evidential deep learning for predicting the minimum inhibitory concentrations of antimicrobial peptides"
 The current main training path uses evidential regression to make predictions while estimating uncertainty to enhance prediction quality.
 
 Core scripts:
